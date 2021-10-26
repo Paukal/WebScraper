@@ -1,0 +1,3 @@
+Then to run it, execute the following in the terminal:
+
+$ auto-py-to-exe
