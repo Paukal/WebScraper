@@ -11,12 +11,23 @@ import sys
 from PySide2.QtCore import *
 from PySide2.QtGui import *
 from PySide2.QtWidgets import *
+from os.path import exists
+import jpype
+import asposecells
+jpype.startJVM()
+from asposecells.api import Workbook, FileFormatType
+
+VERSION = "v20211104"
 
 xlsx_location = "./PT_testing.xlsx"
 keyword1 = "Webai"
 keyword2 = "Keywords"
 url_count = 5
 keywords_match = 4
+column_read = 'B'
+read_from_line = 1
+
+export_object_excel = None
 
 df = []
 df2 = []
@@ -40,10 +51,11 @@ class Main():
             xlsx_location = ui.lineEdit.text()
             keyword1 = ui.lineEdit_2.text()
             keyword2 = ui.lineEdit_3.text()
+            column_read = ui.lineEdit_4.text()
             #loading the URLS
-            df = pd.read_excel(xlsx_location, sheet_name=keyword1, usecols='B')
+            df = pd.read_excel(xlsx_location, sheet_name=keyword1, usecols=column_read, skiprows=read_from_line-2)
             #loading the keywords
-            df2 = pd.read_excel(xlsx_location, sheet_name=keyword2, usecols='B')
+            df2 = pd.read_excel(xlsx_location, sheet_name=keyword2, usecols=column_read)
             print('Data loading complete')
             ui.textBrowser.clear()
             ui.updateText(MainWindow, ["Database loaded.", ""])
@@ -65,15 +77,24 @@ class Main():
         global url_count
         global df, df2
 
+        file_exists = exists('results.xlsx')
+        if not file_exists:
+            df3 = pd.DataFrame([['', '']],columns=['Link', 'Result'])
+            df3.to_excel("results.xlsx", index=False)
+
         temp_url_count = url_count
         try:
             ui.textBrowser.clear()
             yes = 0
-            no = 0
             manual = 0
+            no = 0
+
+            i = 2
 
             for URL in df.values.tolist():
                 try:
+                    isNo = False #dont print the line if it doesnt match the keywords
+
                     text = ["",""]
                     temp_url_count -= 1
 
@@ -111,8 +132,8 @@ class Main():
                         yes += 1
                     else:
                         print('false')
-                        text[1] += " - NO "
                         no += 1
+                        isNo = True
 
                 except UnboundLocalError as e:
                     print(e)
@@ -144,8 +165,36 @@ class Main():
                     text[1] += " - ?? "
                     manual += 1
                     pass
-                ui.updateText(MainWindow, text)
-            text[0] = "<br> - Total yes: {0}, no: {1}, check manually: {2}.".format(yes, no, manual)
+                #if the url passed
+                if not isNo:
+                    #writing to excel logic
+                    try:
+                        # create a new XLSX workbook
+                        wb = Workbook("results.xlsx")
+                        # insert value in the cells
+                        wb.getWorksheets().get(0).getCells().get("A{0}".format(i)).putValue(web_url)
+                        wb.getWorksheets().get(0).getCells().get("B{0}".format(i)).putValue(text[1])
+                        # save workbook as .xlsx file
+                        wb.save("results.xlsx")
+                        i+=1
+
+                        with pd.ExcelWriter("results.xlsx", engine='openpyxl', mode='a') as writer:
+                            workBook = writer.book
+                            try:
+                                workBook.remove(workBook["Evaluation Warning"])
+                            except:
+                                print("There is no such sheet in this file")
+                            finally:
+                                #dataframe.to_excel(writer, sheet_name=sheetname,index=False)
+                                writer.save()
+                    except:
+                        Main.clearScreen()
+                        ui.updateText(MainWindow, ["Close results.xlsx file!", ""])
+                        break
+
+                    ui.updateText(MainWindow, text)
+
+            text[0] = "<br> - Total yes: {0}, no: {1} check manually: {2}.".format(yes, no, manual)
             ui.updateText(MainWindow, text)
 
         except AttributeError as e:
@@ -160,6 +209,10 @@ class Main():
         global keywords_match
         keywords_match = ui.spinBox_2.value()
 
+    def changeFromWhichLineToRead():
+        global read_from_line
+        read_from_line = ui.spinBox_3.value()
+
     def clearScreen():
         ui.textBrowser.clear()
 
@@ -173,18 +226,20 @@ class Ui_MainWindow(object):
 
         self.pushButton = QPushButton(self.centralwidget)
         self.pushButton.setObjectName(u"pushButton")
-        self.pushButton.setGeometry(QRect(420, 170, 221, 23))
+        self.pushButton.setGeometry(QRect(420, 290, 221, 23))
         self.pushButton.clicked.connect(Main.load_data_from_xml)
 
         self.spinBox = QSpinBox(self.centralwidget)
         self.spinBox.setObjectName(u"spinBox")
-        self.spinBox.setGeometry(QRect(600, 130, 42, 22))
+        self.spinBox.setGeometry(QRect(580, 130, 61, 22))
         self.spinBox.setValue(url_count)
+        self.spinBox.setMinimum(1)
+        self.spinBox.setMaximum(10000)
         self.spinBox.valueChanged.connect(Main.changeNumberOfLinks)
 
         self.label = QLabel(self.centralwidget)
         self.label.setObjectName(u"label")
-        self.label.setGeometry(QRect(420, 130, 111, 20))
+        self.label.setGeometry(QRect(410, 130, 111, 20))
 
         self.textBrowser = QTextBrowser(self.centralwidget)
         self.textBrowser.setObjectName(u"textBrowser")
@@ -195,18 +250,19 @@ class Ui_MainWindow(object):
 
         self.spinBox_2 = QSpinBox(self.centralwidget)
         self.spinBox_2.setObjectName(u"spinBox_2")
-        self.spinBox_2.setGeometry(QRect(600, 100, 42, 22))
+        self.spinBox_2.setGeometry(QRect(580, 160, 61, 22))
         self.spinBox_2.setValue(keywords_match)
+        self.spinBox_2.setMinimum(1)
         self.spinBox_2.valueChanged.connect(Main.changeNumberOfKeywords)
 
         self.label_2 = QLabel(self.centralwidget)
         self.label_2.setObjectName(u"label_2")
-        self.label_2.setGeometry(QRect(420, 100, 91, 16))
+        self.label_2.setGeometry(QRect(410, 160, 91, 16))
         self.label_2.setTextFormat(Qt.PlainText)
 
         self.pushButton_2 = QPushButton(self.centralwidget)
         self.pushButton_2.setObjectName(u"pushButton_2")
-        self.pushButton_2.setGeometry(QRect(420, 200, 221, 23))
+        self.pushButton_2.setGeometry(QRect(420, 320, 221, 23))
         self.pushButton_2.clicked.connect(Main.scrape)
 
         self.lineEdit = QLineEdit(self.centralwidget)
@@ -215,7 +271,7 @@ class Ui_MainWindow(object):
 
         self.label_3 = QLabel(self.centralwidget)
         self.label_3.setObjectName(u"label_3")
-        self.label_3.setGeometry(QRect(420, 10, 71, 16))
+        self.label_3.setGeometry(QRect(410, 10, 71, 16))
 
         self.lineEdit_2 = QLineEdit(self.centralwidget)
         self.lineEdit_2.setObjectName(u"lineEdit_2")
@@ -227,16 +283,37 @@ class Ui_MainWindow(object):
 
         self.label_4 = QLabel(self.centralwidget)
         self.label_4.setObjectName(u"label_4")
-        self.label_4.setGeometry(QRect(420, 40, 81, 16))
+        self.label_4.setGeometry(QRect(410, 40, 81, 16))
 
         self.label_5 = QLabel(self.centralwidget)
         self.label_5.setObjectName(u"label_5")
-        self.label_5.setGeometry(QRect(420, 70, 111, 16))
+        self.label_5.setGeometry(QRect(410, 70, 111, 16))
 
         self.pushButton_3 = QPushButton(self.centralwidget)
         self.pushButton_3.setObjectName(u"pushButton_3")
-        self.pushButton_3.setGeometry(QRect(420, 230, 221, 23))
+        self.pushButton_3.setGeometry(QRect(420, 350, 221, 23))
         self.pushButton_3.clicked.connect(Main.clearScreen)
+
+        self.lineEdit_4 = QLineEdit(self.centralwidget)
+        self.lineEdit_4.setObjectName(u"lineEdit_4")
+        self.lineEdit_4.setGeometry(QRect(620, 190, 21, 20))
+        self.lineEdit_4.setText(column_read)
+
+        self.label_6 = QLabel(self.centralwidget)
+        self.label_6.setObjectName(u"label_6")
+        self.label_6.setGeometry(QRect(410, 190, 151, 16))
+
+        self.spinBox_3 = QSpinBox(self.centralwidget)
+        self.spinBox_3.setObjectName(u"spinBox_3")
+        self.spinBox_3.setGeometry(QRect(530, 100, 111, 22))
+        self.spinBox_3.setMinimum(2)
+        self.spinBox_3.setMaximum(1000000)
+        self.spinBox_3.setValue(read_from_line)
+        self.spinBox_3.valueChanged.connect(Main.changeFromWhichLineToRead)
+
+        self.label_7 = QLabel(self.centralwidget)
+        self.label_7.setObjectName(u"label_7")
+        self.label_7.setGeometry(QRect(410, 100, 71, 16))
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
@@ -253,7 +330,7 @@ class Ui_MainWindow(object):
     # setupUi
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"TimberScraper", None))
+        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"TimberScraper {0}".format(VERSION), None))
         self.pushButton.setText(QCoreApplication.translate("MainWindow", u"Load database", None))
         self.label.setText(QCoreApplication.translate("MainWindow", u"Number of links to load", None))
         self.label_2.setText(QCoreApplication.translate("MainWindow", u"Keywords to match", None))
@@ -265,6 +342,8 @@ class Ui_MainWindow(object):
         self.label_4.setText(QCoreApplication.translate("MainWindow", u"Links sheet name", None))
         self.label_5.setText(QCoreApplication.translate("MainWindow", u"Keywords sheet name", None))
         self.pushButton_3.setText(QCoreApplication.translate("MainWindow", u"Clear screen", None))
+        self.label_6.setText(QCoreApplication.translate("MainWindow", u"Links and keywords in column", None))
+        self.label_7.setText(QCoreApplication.translate("MainWindow", u"Load from line", None))
     # retranslateUi
 
     def updateText(self, MainWindow, text):

@@ -1,0 +1,21 @@
+TIMBER SCRAPER (v20211021) DOKUMENTACIJA
+============================================================================
+============================================================================
+
+VARTOTOJO SĄSAJA:
+* Mygtukas "Load database" - nuskaito xlsx (excel) failo duomenis iš sheets'ų:
+	Webai - B stulpelyje surašyti link'ai, kuriuos reikia tikrinti (pirma eilutė netikrinama)
+	Keywords - B stulpelyje surašyti keywords, pagal kuriuos bus tikrinami link'ai (pirma eilutė netikrinama)
+* Mygtukas "Scrape links" - paspaudus tikrinami link'ai pagal nuskaitytus keywords
+* Skaičių laukelis nr. 1 - kiek link'ų nuskaityti iš xlsx (excel) failo (Bus padaryta limitacija, pvz. ne daugiau nei 1000)
+* Skaičių laukelis nr. 2 - kiek keywords'ų turi atitikti, kad link'as gautų reikšmę "yes"
+* Tekstinis laukas su link'ų sąrašu - rodomi iš xlsx (excel) nuskaityti link'ai bei šalia jų reikšmės yes-no
+
+============================================================================
+
+PAGRINDINIAI PASTEBĖJIMAI:
+1. Jei randamas bet koks keyword atitikimas (net ir kitokio žodžio šaknyje), yra laikoma, kad keyword yra true (egzistuoja)
+2. Į keywords reiks įrašyt visas galimas žodžio variacijas, nes ieškos būtent tokios žodžio formos, kuri bus įrašyta
+3. Su kai kuriais link'ais neveikia. Daugmaž 20proc link'ų gali likti nepatikrinti
+
+============================================================================
