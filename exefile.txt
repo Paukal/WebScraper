@@ -1,3 +1,5 @@
+https://stackoverflow.com/questions/12059509/create-a-single-executable-from-a-python-project
+
 Then to run it, execute the following in the terminal:
 
-$ auto-py-to-exe
+$ auto-py-to-exe TS.py

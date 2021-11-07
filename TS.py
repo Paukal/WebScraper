@@ -5,29 +5,23 @@ import psycopg2
 import socket
 import ssl
 import pandas as pd
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QMainWindow
 import sys
 from PySide2.QtCore import *
 from PySide2.QtGui import *
 from PySide2.QtWidgets import *
 from os.path import exists
-import jpype
-import asposecells
-jpype.startJVM()
-from asposecells.api import Workbook, FileFormatType
+import openpyxl
 
-VERSION = "v20211104"
+VERSION = "v20211108"
 
 xlsx_location = "./PT_testing.xlsx"
+results_xlsx = "results.xlsx"
 keyword1 = "Webai"
 keyword2 = "Keywords"
 url_count = 5
 keywords_match = 4
 column_read = 'B'
 read_from_line = 1
-
-export_object_excel = None
 
 df = []
 df2 = []
@@ -77,10 +71,10 @@ class Main():
         global url_count
         global df, df2
 
-        file_exists = exists('results.xlsx')
+        file_exists = exists(results_xlsx)
         if not file_exists:
             df3 = pd.DataFrame([['', '']],columns=['Link', 'Result'])
-            df3.to_excel("results.xlsx", index=False)
+            df3.to_excel(results_xlsx, index=False)
 
         temp_url_count = url_count
         try:
@@ -88,8 +82,6 @@ class Main():
             yes = 0
             manual = 0
             no = 0
-
-            i = 2
 
             for URL in df.values.tolist():
                 try:
@@ -167,29 +159,18 @@ class Main():
                     pass
                 #if the url passed
                 if not isNo:
-                    #writing to excel logic
+                    #writing to excel file
                     try:
-                        # create a new XLSX workbook
-                        wb = Workbook("results.xlsx")
-                        # insert value in the cells
-                        wb.getWorksheets().get(0).getCells().get("A{0}".format(i)).putValue(web_url)
-                        wb.getWorksheets().get(0).getCells().get("B{0}".format(i)).putValue(text[1])
-                        # save workbook as .xlsx file
-                        wb.save("results.xlsx")
-                        i+=1
+                        workbook = openpyxl.load_workbook(results_xlsx)
+                        worksheet = workbook["Sheet1"]
 
-                        with pd.ExcelWriter("results.xlsx", engine='openpyxl', mode='a') as writer:
-                            workBook = writer.book
-                            try:
-                                workBook.remove(workBook["Evaluation Warning"])
-                            except:
-                                print("There is no such sheet in this file")
-                            finally:
-                                #dataframe.to_excel(writer, sheet_name=sheetname,index=False)
-                                writer.save()
-                    except:
+                        worksheet.append([web_url, text[1]])
+                        workbook.save(results_xlsx)
+
+                    except Exception as e:
+                        print(e)
                         Main.clearScreen()
-                        ui.updateText(MainWindow, ["Close results.xlsx file!", ""])
+                        ui.updateText(MainWindow, ["Error with xlsx file. Try closing the {0} file!".format(results_xlsx), ""])
                         break
 
                     ui.updateText(MainWindow, text)
@@ -335,10 +316,10 @@ class Ui_MainWindow(object):
         self.label.setText(QCoreApplication.translate("MainWindow", u"Number of links to load", None))
         self.label_2.setText(QCoreApplication.translate("MainWindow", u"Keywords to match", None))
         self.pushButton_2.setText(QCoreApplication.translate("MainWindow", u"Scrape", None))
-        self.lineEdit.setText(QCoreApplication.translate("MainWindow", u"filename.xlsx", None))
+        self.lineEdit.setText(QCoreApplication.translate("MainWindow", u"{0}".format(xlsx_location), None))
         self.label_3.setText(QCoreApplication.translate("MainWindow", u".xlsx database", None))
-        self.lineEdit_2.setText(QCoreApplication.translate("MainWindow", u"sheet1", None))
-        self.lineEdit_3.setText(QCoreApplication.translate("MainWindow", u"sheet2", None))
+        self.lineEdit_2.setText(QCoreApplication.translate("MainWindow", u"{0}".format(keyword1), None))
+        self.lineEdit_3.setText(QCoreApplication.translate("MainWindow", u"{0}".format(keyword2), None))
         self.label_4.setText(QCoreApplication.translate("MainWindow", u"Links sheet name", None))
         self.label_5.setText(QCoreApplication.translate("MainWindow", u"Keywords sheet name", None))
         self.pushButton_3.setText(QCoreApplication.translate("MainWindow", u"Clear screen", None))
