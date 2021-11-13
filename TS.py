@@ -2,8 +2,6 @@ from bs4 import BeautifulSoup
 from urllib.request import Request, urlopen
 import urllib
 import psycopg2
-import socket
-import ssl
 import pandas as pd
 import sys
 from PySide2.QtCore import *
@@ -11,8 +9,13 @@ from PySide2.QtGui import *
 from PySide2.QtWidgets import *
 from os.path import exists
 import openpyxl
+import re
 
-VERSION = "v20211108"
+#for memory usage limitations:
+from limiter import limit_memory
+limit_memory(1000) # 1000 megs maximum
+
+VERSION = "v20211113"
 
 xlsx_location = "./PT_testing.xlsx"
 results_xlsx = "results.xlsx"
@@ -73,7 +76,7 @@ class Main():
 
         file_exists = exists(results_xlsx)
         if not file_exists:
-            df3 = pd.DataFrame([['', '']],columns=['Link', 'Result'])
+            df3 = pd.DataFrame([['', '', '']],columns=['Link', 'Result', 'Email'])
             df3.to_excel(results_xlsx, index=False)
 
         temp_url_count = url_count
@@ -86,6 +89,7 @@ class Main():
             for URL in df.values.tolist():
                 try:
                     isNo = False #dont print the line if it doesnt match the keywords
+                    email = []
 
                     text = ["",""]
                     temp_url_count -= 1
@@ -112,8 +116,9 @@ class Main():
 
                     num = 0
 
+                    website_text = soup.get_text()
                     for keyword in df2.values.tolist():
-                        if keyword[0] in soup.get_text():
+                        if keyword[0] in website_text:
                             num += 1
 
                     #print(" ".join(soup.get_text().split()))
@@ -122,41 +127,21 @@ class Main():
                         print('true')
                         text[1] += " - YES "
                         yes += 1
+                        #searching for email:
+                        email = re.search(".*@.*(pt)$", website_text)
                     else:
                         print('false')
                         no += 1
                         isNo = True
 
-                except UnboundLocalError as e:
+                except Exception as e:
                     print(e)
                     text[1] += " - ?? "
                     manual += 1
+                    #searching for email:
+                    email = re.search(".*@.*pt", website_text)
                     pass
-                except urllib.error.HTTPError as e:
-                    print(e)
-                    text[1] += " - ?? "
-                    manual += 1
-                    pass
-                except socket.timeout as e:
-                    print(e)
-                    text[1] += " - ?? "
-                    manual += 1
-                    pass
-                except UnicodeDecodeError as e:
-                    print(e)
-                    text[1] += " - ?? "
-                    manual += 1
-                    pass
-                except ssl.SSLCertVerificationError as e:
-                    print(e)
-                    text[1] += " - ?? "
-                    manual += 1
-                    pass
-                except urllib.error.URLError as e:
-                    print(e)
-                    text[1] += " - ?? "
-                    manual += 1
-                    pass
+
                 #if the url passed
                 if not isNo:
                     #writing to excel file
@@ -164,16 +149,25 @@ class Main():
                         workbook = openpyxl.load_workbook(results_xlsx)
                         worksheet = workbook["Sheet1"]
 
-                        worksheet.append([web_url, text[1]])
+                        if email is None:
+                            email = [None] * 2
+                            email[0] = ""
+
+                        worksheet.append([web_url, text[1], email[0]])
                         workbook.save(results_xlsx)
 
                     except Exception as e:
                         print(e)
-                        Main.clearScreen()
-                        ui.updateText(MainWindow, ["Error with xlsx file. Try closing the {0} file!".format(results_xlsx), ""])
-                        break
+
+                        if results_xlsx in str(e):
+                            Main.clearScreen()
+                            ui.updateText(MainWindow, ["Error with xlsx file. Try closing the {0} file!".format(results_xlsx), ""])
+                            break
+                        else:
+                            pass
 
                     ui.updateText(MainWindow, text)
+                print("Link number: {0}".format(yes+no+manual))
 
             text[0] = "<br> - Total yes: {0}, no: {1} check manually: {2}.".format(yes, no, manual)
             ui.updateText(MainWindow, text)
@@ -181,6 +175,9 @@ class Main():
         except AttributeError as e:
             print(e)
             ui.updateText(MainWindow, ["Database not loaded!", ""])
+        except Exception as e:
+            print(e)
+            pass
 
     def changeNumberOfLinks():
         global url_count
