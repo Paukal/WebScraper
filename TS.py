@@ -15,7 +15,7 @@ import re
 from limiter import limit_memory
 limit_memory(1000) # 1000 megs maximum
 
-VERSION = "v20211113"
+VERSION = "v20211123"
 
 xlsx_location = "./PT_testing.xlsx"
 results_xlsx = "results.xlsx"
@@ -90,6 +90,7 @@ class Main():
                 try:
                     isNo = False #dont print the line if it doesnt match the keywords
                     email = []
+                    website_text = ""
 
                     text = ["",""]
                     temp_url_count -= 1
@@ -98,22 +99,41 @@ class Main():
                         break
 
                     #web scraper logic
-                    web_url = "https://www.{}".format(URL[0])
-                    text[0] = "<a href={}>{}</a>".format(web_url, web_url) #for printing to screen
+                    web_url = ""
+
+                    if "http" in URL[0]:
+                        web_url = URL[0]
+                    elif "www." in URL[0]:
+                        temp = URL[0].replace("www.", "")
+                        web_url = "https://www.{0}".format(temp)
+                    else:
+                        web_url = "https://www.{0}".format(URL[0])
+
+                    temp_url = web_url
+                    temp_url = temp_url.replace("https://", "")
+                    print("Link number: {0}, URL: {1}".format(yes+no+manual+1, temp_url))
+
+                    text[0] = "<a href={0}>{1}</a>".format(web_url, web_url) #for printing to screen
                     hdr = {'User-Agent': 'Mozilla/93.0'}
                     try:
                         req = Request(web_url,headers=hdr)
                         page = urlopen(req, timeout=10)
-                    except urllib.error.HTTPError as e:
-                        web_url = "http://www.{}".format(URL[0])
-                        text[0] = "<a href={}>{}</a>".format(web_url, web_url) #for printing to screen
+                    except Exception as e:
+                        print(e)
+                        print("HTTPS connection failed. Trying to connect with HTTP protocol...")
+                        web_url = "http://www.{0}".format(URL[0])
+                        text[0] = "<a href={0}>{1}</a>".format(web_url, web_url) #for printing to screen
                         req = Request(web_url,headers=hdr)
-                        page = urlopen(req, timeout=5)
-                        pass
+                        page = urlopen(req, timeout=3)
+                        #pass
 
-                    html = page.read().decode("utf-8")
+                    html = ""
+                    try:
+                        html = page.read().decode("utf-8")
+                    except:
+                        html = page.read().decode("latin-1")
+
                     soup = BeautifulSoup(html, "html.parser")
-
                     num = 0
 
                     website_text = soup.get_text()
@@ -124,22 +144,28 @@ class Main():
                     #print(" ".join(soup.get_text().split()))
 
                     if num >= keywords_match:
-                        print('true')
+                        print('True.\n')
                         text[1] += " - YES "
                         yes += 1
                         #searching for email:
                         email = re.search(".*@.*(pt)$", website_text)
                     else:
-                        print('false')
+                        print('False.\n')
                         no += 1
                         isNo = True
 
                 except Exception as e:
                     print(e)
-                    text[1] += " - ?? "
-                    manual += 1
-                    #searching for email:
-                    email = re.search(".*@.*pt", website_text)
+                    if "getaddrinfo failed" in str(e) or "Error 404" in str(e) or "Error 400" in str(e):
+                        print('False.\n')
+                        no += 1
+                        isNo = True
+                    else:
+                        text[1] += " - ?? "
+                        manual += 1
+                        #searching for email:
+                        email = re.search(".*@.*pt", website_text)
+                        print('\n')
                     pass
 
                 #if the url passed
@@ -167,7 +193,6 @@ class Main():
                             pass
 
                     ui.updateText(MainWindow, text)
-                print("Link number: {0}".format(yes+no+manual))
 
             text[0] = "<br> - Total yes: {0}, no: {1} check manually: {2}.".format(yes, no, manual)
             ui.updateText(MainWindow, text)
